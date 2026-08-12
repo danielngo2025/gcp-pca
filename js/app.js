@@ -137,14 +137,14 @@
     const cards = $('[data-go-cards]');
     if (cards) cards.onclick = () => {
       startCardQueue('due');
-      location.hash = 'drill/cards';
+      location.hash = 'study/decisions';
     };
 
     const d = $('[data-drill]');
     if (d) d.onclick = () => {
       if (!Quiz.start(d.dataset.drill, { section: d.dataset.section })) return;
       quizStage = 'run';
-      location.hash = 'drill/mock';
+      location.hash = 'mock';
     };
   }
 
@@ -422,7 +422,7 @@
       b.onclick = () => {
         if (!Quiz.start('topic', { topic: b.dataset.tdrill })) return;
         quizStage = 'run';
-        location.hash = 'drill/mock';
+        location.hash = 'mock';
       };
     });
 
@@ -468,29 +468,94 @@
     URL.revokeObjectURL(a.href);
   }
 
-  /* ---------------- Study · decision tables ---------------- */
+  /* ---------------- Study · decisions (tables + the cards that test them) ---------------- */
 
-  function viewTables() {
+  const cardsByTopic = () => window.FLASHCARDS.reduce((m, c) => {
+    (m[c.topic] = m[c.topic] || []).push(c);
+    return m;
+  }, {});
+
+  function viewDecisions() {
+    if (cardQueue) return viewCardRunner();
+
+    const all = window.FLASHCARDS;
+    const due = Store.dueCards(all);
+    const byTopic = cardsByTopic();
+    const tabled = new Set(window.DECISIONS.map(d => d.topic));
+    const orphans = Object.keys(byTopic).filter(t => !tabled.has(t)).sort();
+
     return `
-      <div class="card meta"><div>
-        <b>Nine decision tables</b> — service selection is where this exam is won and lost.
-        The third column is the phrase in a question stem that points at that row; that is what you drill.
-        <div class="small dim">Run these from memory on paper during final review.</div>
-      </div></div>
-      ${window.DECISIONS.map(d => `<div class="card">
-        <div class="topic-head">
-          <h3>${esc(d.title)}</h3>
-          <a class="chip cov-partial" href="#study/topics" data-focus="${d.topic}">§${d.topic}</a>
+      <div class="card meta">
+        <div>
+          <b>Nine decision tables · ${all.length} recall cards</b> — service selection is where this
+          exam is won and lost. The third column is the phrase in a question stem that points at that
+          row; that is what you drill.
+          <div class="small dim">Read a table, then drill it from memory — the cards test these same
+          rows. Spaced repetition: what you find hard comes back sooner. ${due.length} due now.</div>
         </div>
-        <p class="note">${esc(d.intro)}</p>
-        <div class="tbl-scroll">
-          <table class="tbl dec stack">
-            <thead><tr>${d.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
-            <tbody>${d.rows.map(r => `<tr>${r.map((cell, i) =>
-              `<td class="${i === 0 ? 'dec-opt' : i === 2 ? 'dec-tell' : ''}" data-label="${esc(d.cols[i] || '')}">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
-          </table>
+        <div class="links">
+          <button class="primary" data-cards="due"${due.length ? '' : ' disabled'}>Review ${due.length} due</button>
+          <button data-cards="all">All ${all.length}</button>
         </div>
-      </div>`).join('')}`;
+      </div>
+
+      ${window.DECISIONS.map(d => {
+        const n = (byTopic[d.topic] || []).length;
+        return `<div class="card">
+          <div class="topic-head">
+            <h3>${esc(d.title)}</h3>
+            <a class="chip cov-partial" href="#study/topics" data-focus="${d.topic}">§${d.topic}</a>
+          </div>
+          <p class="note">${esc(d.intro)}</p>
+          <div class="tbl-scroll">
+            <table class="tbl dec stack">
+              <thead><tr>${d.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+              <tbody>${d.rows.map(r => `<tr>${r.map((cell, i) =>
+                `<td class="${i === 0 ? 'dec-opt' : i === 2 ? 'dec-tell' : ''}" data-label="${esc(d.cols[i] || '')}">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+            </table>
+          </div>
+          ${n ? `<div class="refs" style="margin-top:14px">
+            <button class="ref doc" data-cards="topic" data-topic="${d.topic}">◆ Close the book — drill §${d.topic} as ${n} card${n > 1 ? 's' : ''}</button>
+          </div>` : ''}
+        </div>`;
+      }).join('')}
+
+      ${orphans.length ? `<div class="card">
+        <h2>Recall cards for topics without a table</h2>
+        <p class="small dim">Concept pairs the exam keeps returning to — no service-selection table to sit under.</p>
+        <div class="chips">${orphans.map(t =>
+          `<button class="chip cov-partial" data-cards="topic" data-topic="${t}">§${t} · ${byTopic[t].length}</button>`).join('')}</div>
+      </div>` : ''}`;
+  }
+
+  function viewCardRunner() {
+    if (!cardQueue.length) {
+      return `<div class="card kpi">
+        <div class="kpi-num ok">✓</div>
+        <div class="kpi-label">deck complete</div>
+        <div class="row" style="justify-content:center;margin-top:12px"><button id="c-done" class="primary">Back to the tables</button></div>
+      </div>`;
+    }
+
+    const c = cardQueue[0];
+    const st = Store.card(c.id);
+    return `
+      <div class="card quiz-head">
+        <div><b>Recall drill</b> <span class="dim mono">${cardQueue.length} left · §${c.topic} · streak ${st.streak}</span></div>
+        <div class="quiz-head-right"><button id="c-done">End</button></div>
+      </div>
+      <div class="card flashcard">
+        <p class="fc-q">${esc(c.q)}</p>
+        ${cardShown
+          ? `<p class="fc-a">${esc(c.a)}</p>
+             <div class="fc-grades">
+               <button data-grade="0" class="g0">Again</button>
+               <button data-grade="1" class="g1">Hard</button>
+               <button data-grade="2" class="g2">Good</button>
+               <button data-grade="3" class="g3">Easy</button>
+             </div>`
+          : '<button id="c-show" class="primary">Show answer</button>'}
+      </div>`;
   }
 
   /* ---------------- Study · case studies ---------------- */
@@ -706,8 +771,6 @@
     };
   }
 
-  /* ---------------- Drill · flashcards ---------------- */
-
   let cardQueue = null, cardShown = false;
 
   const shuffled = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
@@ -721,66 +784,10 @@
     cardShown = false;
   }
 
-  function viewCards() {
-    const all = window.FLASHCARDS;
-    const due = Store.dueCards(all);
-
-    if (!cardQueue) {
-      const byTopic = {};
-      all.forEach(c => { byTopic[c.topic] = (byTopic[c.topic] || 0) + 1; });
-
-      return `
-        <div class="card meta"><div>
-          <b>${all.length} cards</b> — the decision tables plus the high-confusion pairs the exam keeps
-          returning to. Spaced repetition: cards you find hard come back sooner.
-          <div class="small dim">${due.length} due now.</div>
-        </div></div>
-        <div class="grid-2">
-          <div class="card">
-            <h2>Drill</h2>
-            <button class="primary" data-cards="due"${due.length ? '' : ' disabled'}>Due now (${due.length})</button>
-            <button class="primary" data-cards="all">All ${all.length} cards</button>
-          </div>
-          <div class="card">
-            <h2>By topic</h2>
-            <div class="chips">${Object.keys(byTopic).sort().map(t =>
-              `<button class="chip cov-partial" data-cards="topic" data-topic="${t}">§${t} · ${byTopic[t]}</button>`).join('')}</div>
-          </div>
-        </div>`;
-    }
-
-    if (!cardQueue.length) {
-      return `<div class="card kpi">
-        <div class="kpi-num ok">✓</div>
-        <div class="kpi-label">deck complete</div>
-        <div class="row" style="justify-content:center;margin-top:12px"><button id="c-done" class="primary">Back</button></div>
-      </div>`;
-    }
-
-    const c = cardQueue[0];
-    const st = Store.card(c.id);
-    return `
-      <div class="card quiz-head">
-        <div><b>Flashcards</b> <span class="dim mono">${cardQueue.length} left · §${c.topic} · streak ${st.streak}</span></div>
-        <div class="quiz-head-right"><button id="c-done">End</button></div>
-      </div>
-      <div class="card flashcard">
-        <p class="fc-q">${esc(c.q)}</p>
-        ${cardShown
-          ? `<p class="fc-a">${esc(c.a)}</p>
-             <div class="fc-grades">
-               <button data-grade="0" class="g0">Again</button>
-               <button data-grade="1" class="g1">Hard</button>
-               <button data-grade="2" class="g2">Good</button>
-               <button data-grade="3" class="g3">Easy</button>
-             </div>`
-          : '<button id="c-show" class="primary">Show answer</button>'}
-      </div>`;
-  }
-
-  function bindCards() {
+  function bindDecisions() {
+    // Entering/leaving the runner swaps the whole tab, so it needs a top like a navigation.
     $$('[data-cards]').forEach(b => {
-      b.onclick = () => { startCardQueue(b.dataset.cards, b.dataset.topic); render(); };
+      b.onclick = () => { startCardQueue(b.dataset.cards, b.dataset.topic); render(); window.scrollTo(0, 0); };
     });
     const show = $('#c-show');
     if (show) show.onclick = () => { cardShown = true; render(); };
@@ -796,36 +803,33 @@
       };
     });
     const done = $('#c-done');
-    if (done) done.onclick = () => { cardQueue = null; cardShown = false; render(); };
+    if (done) done.onclick = () => { cardQueue = null; cardShown = false; render(); window.scrollTo(0, 0); };
   }
 
   /* ---------------- Shell ---------------- */
 
-  // Four modes. Anything with more than one job inside it gets sub-tabs, never a nav slot.
+  // Split by object: each Study tab owns one thing and carries its own practice.
+  // Mock is separate because a timed, weighted, scored run is a different act, not
+  // another way to look at the same material.
   const VIEWS = {
     today: { render: viewToday, bind: bindToday },
     plan:  { render: viewPlan,  bind: bindPlan },
     study: {
       def: 'topics',
       tabs: {
-        topics:    { label: 'Topics',    render: viewTopics, bind: bindTopics },
-        decisions: { label: 'Decisions', render: viewTables, bind: () => {} },
-        cases:     { label: 'Cases',     render: viewCases,  bind: bindCases }
+        topics:    { label: 'Topics',    render: viewTopics,    bind: bindTopics },
+        decisions: { label: 'Decisions', render: viewDecisions, bind: bindDecisions },
+        cases:     { label: 'Cases',     render: viewCases,     bind: bindCases }
       }
     },
-    drill: {
-      def: 'mock',
-      tabs: {
-        mock:  { label: 'Mock exam',  render: viewQuiz,  bind: bindQuiz },
-        cards: { label: 'Flashcards', render: viewCards, bind: bindCards }
-      }
-    }
+    mock: { render: viewQuiz, bind: bindQuiz }
   };
 
   // Old bookmarks and any stale deep link still land somewhere sensible.
   const LEGACY = {
     dashboard: 'today', blueprint: 'study/topics', notes: 'study/topics',
-    tables: 'study/decisions', cases: 'study/cases', quiz: 'drill/mock', cards: 'drill/cards'
+    tables: 'study/decisions', cases: 'study/cases', quiz: 'mock', cards: 'study/decisions',
+    drill: 'mock', 'drill/mock': 'mock', 'drill/cards': 'study/decisions'
   };
 
   let pendingFocus = null, lastRoute = null;
@@ -879,10 +883,11 @@
     }).join('')}</div>`;
   }
 
+  const openGaps = () => allTopics().filter(t => t.prep === 'gap' && Store.topicCompletion(t.id) < 1).length;
+
   function tabBadge(name, tab) {
-    if (name === 'drill' && tab === 'cards') return Store.dueCards(window.FLASHCARDS).length;
-    if (name === 'drill' && tab === 'mock') return Store.leeches().length;
-    if (name === 'study' && tab === 'topics') return allTopics().filter(t => t.prep === 'gap' && Store.topicCompletion(t.id) < 1).length;
+    if (name === 'study' && tab === 'topics') return openGaps();
+    if (name === 'study' && tab === 'decisions') return Store.dueCards(window.FLASHCARDS).length;
     return 0;
   }
 
@@ -891,8 +896,8 @@
     const counts = {
       today: openTasks().length,
       plan: slippedTasks(),
-      study: tabBadge('study', 'topics'),
-      drill: Store.dueCards(window.FLASHCARDS).length + Store.leeches().length
+      study: openGaps() + Store.dueCards(window.FLASHCARDS).length,
+      mock: Store.leeches().length
     };
     $$('nav > a').forEach(a => {
       const key = a.getAttribute('href').slice(1);

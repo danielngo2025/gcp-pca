@@ -38,7 +38,10 @@ treat the framework as a required primary source, not background reading.
 
 ## Views
 
-Four modes, one per job. Nav badges show how many things are waiting behind each.
+Four modes. The split is by **object, not activity** — each thing has exactly one home and
+carries its own practice, so you never meet the same material in two places. (Splitting
+learn-vs-test was tried and abandoned: it cuts across the material, so the decision tables
+legitimately belonged on both sides of the line.) Nav badges show what is waiting behind each.
 
 ### Today
 The landing view and the only one you need on a normal study day: days to exam, your last
@@ -55,6 +58,8 @@ The 9-week schedule at ~15 h/week with ~80 tickable tasks and slip detection, pl
 actually is rather than which bar looks shortest. Mock scores are logged here.
 
 ### Study
+Three tabs, one per kind of object. Each both teaches and tests the thing it owns.
+
 - **Topics** — all 22 sub-sections as one collapsed row each: § id, title, prep signal
   (foundational / partial / **gap**), actions done, confidence, notes indicator. Open a row
   for the guide's verbatim bullets, official doc links, read / hands-on / drilled tracking,
@@ -63,20 +68,23 @@ actually is rather than which bar looks shortest. Mock scores are logged here.
 - **Decisions** — the nine tables that decide this exam: compute, database, storage class,
   load balancer, hybrid connectivity, DR pattern, migration strategy, IAM control, and
   AI/agent product. The third column of each is *the tell* — the phrase in a question stem
-  that points at that row. That is what you drill, not the feature lists.
+  that points at that row. That is what you drill, not the feature lists. **The 55 recall
+  cards live here too**, under the table each one tests — read a table, then close the book
+  and drill it. Spaced repetition (Again → 10 min, Good → 1 day, then intervals expanding by
+  an ease factor). Cards for topics with no table are listed at the bottom, so all 55 stay
+  reachable.
 - **Cases** — all four, each with the existing environment mapped to what it implies, every
   requirement tagged (business / technical / non-functional / compliance) with the decision
   it forces and the service answer, a reference architecture held back until you have
   written your own, and the traps that case sets. 53 requirements and 29 traps across the
   four.
 
-### Drill
-- **Mock exam** — a full 60-question timed mock (120 minutes, auto-submits, sampled
-  weighted to the real section percentages), per-section and per-topic drills, a
-  wrong-answers-only retake, and a leech list of questions missed twice or more. Every
-  question carries an explanation and links back to its Study topic.
-- **Flashcards** — 55 cards with spaced repetition (Again → 10 min, Good → 1 day, then
-  intervals expanding by an ease factor).
+### Mock
+The timed scored run, which is a genuinely different act from studying: a full 60-question
+mock (120 minutes, auto-submits, sampled weighted to the real section percentages), plus
+section drills, a wrong-answers-only retake, and a leech list of questions missed twice or
+more. Per-topic drills launched from Study land here too. Every question carries an
+explanation and links back to its Study topic.
 
 Notes live inside the topic they belong to rather than in a separate view, and still export
 as one markdown file. Confidence rating is deliberately separate from the checkboxes:
@@ -84,7 +92,7 @@ familiarity is the thing most likely to mislead you — trust mock scores over h
 feels.
 
 Old hash links (`#blueprint`, `#dashboard`, `#tables`, `#notes`, `#quiz`, `#cards`,
-`#cases`) redirect to their new homes, so existing bookmarks keep working.
+`#cases`, `#drill/*`) redirect to their new homes, so existing bookmarks keep working.
 
 ## Run it locally
 

@@ -38,33 +38,53 @@ treat the framework as a required primary source, not background reading.
 
 ## Views
 
-- **Dashboard** — countdown, weighted "exam surface covered", and an *unearned weight*
-  column per section so you can see where the next mark actually is rather than which bar
-  looks shortest.
-- **Blueprint** — all 22 sub-sections with the guide's verbatim bullets. Per topic: read /
-  hands-on / drilled tracking, a 1–5 confidence rating, official doc links, and a prep
-  signal (foundational / partial / **gap**) flagging the 10 sub-sections most candidates
-  are under-prepared on. Filter by gaps or low confidence.
-- **Plan** — a 9-week schedule at ~15 h/week with ~80 tickable tasks and slip detection.
-- **Mock tests** — a full 60-question timed mock (120 minutes, auto-submits, sampled
-  weighted to the real section percentages), per-section drills, a wrong-answers-only
-  retake, and a leech list of questions missed twice or more. Every question carries an
-  explanation and links back to its blueprint sub-section.
-- **Flashcards** — 55 cards with spaced repetition (Again → 10 min, Good → 1 day, then
-  intervals expanding by an ease factor).
-- **Decision tables** — the nine that decide this exam: compute, database, storage class,
+Four modes, one per job. Nav badges show how many things are waiting behind each.
+
+### Today
+The landing view and the only one you need on a normal study day: days to exam, your last
+mock score, the current week, then **one card** with today's three unticked tasks, the
+flashcards due, and a single recommended drill (leeches if they have piled up, otherwise
+the section with the most exam weight still unearned). Everything else can wait.
+
+Exam-surface coverage sits at the bottom as a progress bar, not a headline. It is
+self-ticked, so it measures effort, not readiness — the mock score is the number to trust.
+
+### Plan
+The 9-week schedule at ~15 h/week with ~80 tickable tasks and slip detection, plus the
+*points left* table — section weight × (1 − ticked) — so you can see where the next mark
+actually is rather than which bar looks shortest. Mock scores are logged here.
+
+### Study
+- **Topics** — all 22 sub-sections as one collapsed row each: § id, title, prep signal
+  (foundational / partial / **gap**), actions done, confidence, notes indicator. Open a row
+  for the guide's verbatim bullets, official doc links, read / hands-on / drilled tracking,
+  a 1–5 confidence rating, **your own notes**, and a one-click drill of that topic's
+  questions. Filter by gaps, low confidence, unfinished or noted.
+- **Decisions** — the nine tables that decide this exam: compute, database, storage class,
   load balancer, hybrid connectivity, DR pattern, migration strategy, IAM control, and
   AI/agent product. The third column of each is *the tell* — the phrase in a question stem
   that points at that row. That is what you drill, not the feature lists.
-- **Case studies** — all four, each with the existing environment mapped to what it
-  implies, every requirement tagged (business / technical / non-functional / compliance)
-  with the decision it forces and the service answer, a reference architecture held back
-  until you have written your own, and the traps that case sets. 53 requirements and
-  29 traps across the four.
-- **Notes** — per-sub-section notes in your own words, exportable as one markdown file.
+- **Cases** — all four, each with the existing environment mapped to what it implies, every
+  requirement tagged (business / technical / non-functional / compliance) with the decision
+  it forces and the service answer, a reference architecture held back until you have
+  written your own, and the traps that case sets. 53 requirements and 29 traps across the
+  four.
 
-Confidence rating is deliberately separate from the checkboxes. Familiarity is the thing
-most likely to mislead you — trust mock scores over how a topic feels.
+### Drill
+- **Mock exam** — a full 60-question timed mock (120 minutes, auto-submits, sampled
+  weighted to the real section percentages), per-section and per-topic drills, a
+  wrong-answers-only retake, and a leech list of questions missed twice or more. Every
+  question carries an explanation and links back to its Study topic.
+- **Flashcards** — 55 cards with spaced repetition (Again → 10 min, Good → 1 day, then
+  intervals expanding by an ease factor).
+
+Notes live inside the topic they belong to rather than in a separate view, and still export
+as one markdown file. Confidence rating is deliberately separate from the checkboxes:
+familiarity is the thing most likely to mislead you — trust mock scores over how a topic
+feels.
+
+Old hash links (`#blueprint`, `#dashboard`, `#tables`, `#notes`, `#quiz`, `#cards`,
+`#cases`) redirect to their new homes, so existing bookmarks keep working.
 
 ## Run it locally
 
@@ -90,7 +110,7 @@ css/app.css
 js/store.js           localStorage persistence, readiness math, quiz history,
                       SM-2 card scheduling, export/import
 js/quiz.js            mock test engine — weighted sampling, timer, scoring, review
-js/app.js             hash router + the eight views
+js/app.js             hash router (#mode/tab) + the four modes
 data/blueprint.js     6 sections → 22 sub-sections, verbatim official bullets,
                       exam weights, doc links, prep signals
 data/plan.js          the 9-week study plan, ~80 tickable tasks

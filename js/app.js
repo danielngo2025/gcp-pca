@@ -1,6 +1,7 @@
 (function () {
   const BP = window.BLUEPRINT, PLAN = window.PLAN;
   const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const PREP = {
@@ -24,217 +25,25 @@
     return t < day(PLAN.weeks[0].from) ? null : 'past';
   }
 
-  /* ---------------- Dashboard ---------------- */
+  const lastMock = () => Store.state.mocks[Store.state.mocks.length - 1] || null;
+  const mockPct = m => Math.round(m.score / m.total * 100);
 
-  function viewDashboard() {
-    const examDate = Store.state.examDate;
-    const left = daysBetween(today(), day(examDate));
-    const readiness = Store.readiness();
+  // Open tasks in the current week, in plan order.
+  function openTasks() {
     const cw = currentWeek();
-    const mocks = Store.state.mocks;
-
-    const sectionRows = BP.sections.map(s => {
-      const pct = Store.sectionCompletion(s) * 100;
-      // Unearned weight = where the next point actually is.
-      const gap = (s.weight * (1 - pct / 100)).toFixed(1);
-      return `<tr>
-        <td class="mono sec-id">§${s.id}</td>
-        <td data-label="Section">${esc(s.title)}</td>
-        <td class="mono" data-label="Weight">${s.weight}%</td>
-        <td class="bar-cell" data-label="Covered"><div class="bar"><i style="width:${pct.toFixed(0)}%"></i></div><span class="mono dim">${pct.toFixed(0)}%</span></td>
-        <td class="mono ${gap > 8 ? 'warn' : ''}" data-label="Unearned">${gap}</td>
-      </tr>`;
-    }).join('');
-
-    const gaps = allTopics().filter(t => t.prep === 'gap' && Store.topicCompletion(t.id) < 1);
-    const priority = gaps.filter(t => t.priority);
-
-    const next = (cw && cw !== 'past')
-      ? cw.tasks.map((task, i) => ({ task, key: `w${cw.n}:${i}` })).filter(x => !Store.task(x.key)).slice(0, 3)
-      : [];
-
-    const trend = mocks.length
-      ? mocks.map(m => `<li><span class="mono">${m.date}</span> <b>${Math.round(m.score / m.total * 100)}%</b> <span class="dim">${m.score}/${m.total} ${esc(m.label)}</span></li>`).join('')
-      : '<li class="dim">No mocks logged yet. Week 1 baseline first.</li>';
-
-    return `
-      <div class="grid-3">
-        <div class="card kpi">
-          <div class="kpi-num ${left < 14 ? 'warn' : ''}">${left}</div>
-          <div class="kpi-label">days to exam</div>
-          <div class="dim small">${day(examDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' })}</div>
-          <input type="date" id="exam-date" value="${examDate}">
-        </div>
-        <div class="card kpi">
-          <div class="kpi-num">${readiness.toFixed(0)}<span class="unit">%</span></div>
-          <div class="kpi-label">exam surface covered</div>
-          <div class="dim small">weighted by section, not topic count</div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-num">${cw && cw !== 'past' ? cw.n : (cw === 'past' ? '—' : '0')}<span class="unit">/9</span></div>
-          <div class="kpi-label">current study week</div>
-          <div class="dim small">${cw && cw !== 'past' ? esc(cw.theme) : (cw === 'past' ? 'past the plan — mock mode' : 'starts ' + fmt(PLAN.weeks[0].from))}</div>
-        </div>
-      </div>
-
-      ${priority.length ? `<div class="alert">
-        <b>Highest-risk topic still open:</b>
-        ${priority.map(t => `<a href="#blueprint" data-focus="${t.id}">§${t.id} ${esc(t.title)}</a>`).join(' · ')}
-        <div class="small">New in the Oct 2025 rewrite, and most third-party prep material has not caught up. Week 6 exists for this.</div>
-      </div>` : ''}
-
-      <div class="grid-2">
-        <div class="card">
-          <h2>Where the next point is</h2>
-          <table class="tbl stack">
-            <thead><tr><th></th><th>Section</th><th>Weight</th><th>Covered</th><th title="Exam weight you have not yet earned">Unearned</th></tr></thead>
-            <tbody>${sectionRows}</tbody>
-          </table>
-          <p class="small dim">Unearned = section weight × (1 − covered). Attack the biggest number, not the lowest percentage.</p>
-        </div>
-
-        <div>
-          <div class="card">
-            <h2>Next 3 actions</h2>
-            ${next.length
-              ? `<ol class="next">${next.map(x => `<li>${esc(x.task)}</li>`).join('')}</ol>
-                 <a class="btn-link" href="#plan">Open week ${cw.n} →</a>`
-              : `<p class="dim">${cw === 'past' ? 'Plan complete — you are in mock-and-review mode.' : cw ? 'Week ' + cw.n + ' is fully ticked. Nice.' : 'Plan starts ' + fmt(PLAN.weeks[0].from) + '.'}</p>`}
-          </div>
-
-          <div class="card">
-            <h2>Mock scores</h2>
-            <ul class="mocks">${trend}</ul>
-            <div class="row">
-              <input type="number" id="mock-score" placeholder="score" min="0">
-              <input type="number" id="mock-total" placeholder="of" value="60" min="1">
-              <input type="text" id="mock-label" placeholder="label (optional)">
-              <button id="mock-add">Log</button>
-            </div>
-            <p class="small dim">Go/no-go gate: ≥75% on section drills before you sit it.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Open gaps — commonly under-prepared topics</h2>
-        ${gaps.length
-          ? `<div class="chips">${gaps.map(t => `<a class="chip cov-none" href="#blueprint" data-focus="${t.id}">§${t.id} ${esc(t.title.slice(0, 52))}${t.title.length > 52 ? '…' : ''}</a>`).join('')}</div>`
-          : '<p class="dim">No open gaps. Verify with mock scores, not self-assessment.</p>'}
-      </div>
-    `;
+    if (!cw || cw === 'past') return [];
+    return cw.tasks
+      .map((task, i) => ({ task, key: `w${cw.n}:${i}`, week: cw }))
+      .filter(x => !Store.task(x.key));
   }
 
-  function bindDashboard() {
-    const d = $('#exam-date');
-    if (d) d.onchange = () => { Store.setExamDate(d.value); render(); };
+  // Sections ranked by exam weight not yet earned — where the next point actually is.
+  const byUnearned = () => BP.sections
+    .map(s => ({ s, unearned: s.weight * (1 - Store.sectionCompletion(s)) }))
+    .sort((a, b) => b.unearned - a.unearned);
 
-    const add = $('#mock-add');
-    if (add) add.onclick = () => {
-      const s = $('#mock-score').value, t = $('#mock-total').value;
-      if (s === '' || t === '' || +t <= 0) return;
-      Store.addMock(s, t, $('#mock-label').value.trim());
-      render();
-    };
-  }
-
-  /* ---------------- Blueprint ---------------- */
-
-  let bpFilter = 'all';
-
-  function viewBlueprint() {
-    const sections = BP.sections.map(s => {
-      const topics = s.topics.filter(t => {
-        if (bpFilter === 'gaps') return t.prep === 'gap';
-        if (bpFilter === 'lowconf') return (Store.topic(t.id).conf || 0) <= 2;
-        if (bpFilter === 'open') return Store.topicCompletion(t.id) < 1;
-        return true;
-      });
-      if (!topics.length) return '';
-
-      return `<section class="card sec">
-        <header class="sec-head">
-          <h2><span class="mono dim">§${s.id}</span> ${esc(s.title)}</h2>
-          <span class="weight">${s.weight}% of exam</span>
-        </header>
-        ${topics.map(t => topicCard(t)).join('')}
-      </section>`;
-    }).join('');
-
-    return `
-      <div class="card meta">
-        <div>
-          <b>Exam guide revision ${BP.guideRevision}</b> — ${BP.exam.questions} questions · ${BP.exam.minutes} min · ${BP.exam.price} · valid ${BP.exam.validityYears} years · case studies ${BP.exam.caseStudyShare} of questions
-          <div class="small dim">Retired case studies: ${BP.retiredCaseStudies.join(', ')}. Any prep source still using these predates the current exam — reject it.</div>
-        </div>
-        <div class="links">
-          <a href="${BP.guideUrl}" target="_blank" rel="noopener">Official guide PDF</a>
-          <a href="${BP.sampleQuestionsUrl}" target="_blank" rel="noopener">Sample questions</a>
-        </div>
-      </div>
-
-      <div class="filters">
-        ${[['all', 'All 22'], ['open', 'Not finished'], ['gaps', 'Book gaps'], ['lowconf', 'Low confidence']]
-          .map(([k, l]) => `<button class="f${bpFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}
-      </div>
-      ${sections || '<div class="card dim">Nothing matches this filter.</div>'}
-    `;
-  }
-
-  function topicCard(t) {
-    const st = Store.topic(t.id);
-    const cov = PREP[t.prep] || PREP.partial;
-    return `<article class="topic${t.priority ? ' prio' : ''}" id="t-${t.id}">
-      <div class="topic-head">
-        <h3><span class="mono">${t.id}</span> ${esc(t.title)}</h3>
-        <span class="chip ${cov.cls}">${cov.label}</span>
-      </div>
-
-      ${t.bullets.length ? `<ul class="bullets">${t.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
-      ${t.note ? `<p class="note">${esc(t.note)}</p>` : ''}
-
-      <div class="refs">
-        ${(t.docs || []).map(d => `<a class="ref doc" href="${d.url}" target="_blank" rel="noopener">${esc(d.label)}</a>`).join('')}
-      </div>
-
-      <div class="track">
-        ${[['read', 'Read'], ['hands', 'Hands-on'], ['drilled', 'Drilled']].map(([k, l]) =>
-          `<label class="cb${st[k] ? ' on' : ''}"><input type="checkbox" data-topic="${t.id}" data-flag="${k}"${st[k] ? ' checked' : ''}> ${l}</label>`).join('')}
-        <span class="conf">Confidence
-          ${[1, 2, 3, 4, 5].map(n => `<button class="dot${st.conf >= n ? ' on' : ''}" data-conf="${t.id}" data-n="${n}" title="${n}/5">${n}</button>`).join('')}
-        </span>
-      </div>
-    </article>`;
-  }
-
-  function bindBlueprint() {
-    document.querySelectorAll('[data-filter]').forEach(b => {
-      b.onclick = () => { bpFilter = b.dataset.filter; render(); };
-    });
-    document.querySelectorAll('input[data-topic]').forEach(cb => {
-      cb.onchange = () => {
-        Store.setTopicFlag(cb.dataset.topic, cb.dataset.flag, cb.checked);
-        cb.closest('.cb').classList.toggle('on', cb.checked);
-      };
-    });
-    document.querySelectorAll('[data-conf]').forEach(b => {
-      b.onclick = () => {
-        const id = b.dataset.conf, n = +b.dataset.n;
-        Store.setConfidence(id, Store.topic(id).conf === n ? 0 : n);
-        render();
-        const el = document.getElementById('t-' + id);
-        if (el) el.scrollIntoView({ block: 'center' });
-      };
-    });
-  }
-
-  /* ---------------- Plan ---------------- */
-
-  function viewPlan() {
-    const cw = currentWeek();
+  function slippedTasks() {
     const t = today();
-
-    // Slip = tasks left in weeks that have already ended.
     let slip = 0;
     PLAN.weeks.forEach(w => {
       if (t > day(w.to)) {
@@ -242,6 +51,110 @@
         slip += c.total - c.done;
       }
     });
+    return slip;
+  }
+
+  /* ---------------- Today ---------------- */
+
+  function viewToday() {
+    const examDate = Store.state.examDate;
+    const left = daysBetween(today(), day(examDate));
+    const cw = currentWeek();
+    const last = lastMock();
+    const pct = last ? mockPct(last) : null;
+    const due = Store.dueCards(window.FLASHCARDS).length;
+    const leech = Store.leeches().length;
+    const coverage = Store.readiness();
+
+    const shortlist = openTasks().slice(0, 3);
+    const worst = byUnearned()[0];
+    const prio = allTopics().filter(t => t.prep === 'gap' && t.priority && Store.topicCompletion(t.id) < 1);
+
+    // One recommended drill: clear the leech list first, otherwise hit the weakest section.
+    const drill = leech >= 5
+      ? { mode: 'leech', label: `Retake ${leech} leeches — questions you have missed twice or more` }
+      : { mode: 'section', section: worst.s.id, label: `Drill §${worst.s.id} ${worst.s.title} — ${worst.unearned.toFixed(1)} points still on the table` };
+
+    return `
+      <div class="grid-3">
+        <div class="card kpi">
+          <div class="kpi-num ${left < 14 ? 'warn' : ''}">${left}</div>
+          <div class="kpi-label">days to exam</div>
+          <div class="dim small">${day(examDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' })}</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-num ${pct === null ? 'dim' : pct >= 75 ? 'ok' : 'warn'}">${pct === null ? '—' : pct}${pct === null ? '' : '<span class="unit">%</span>'}</div>
+          <div class="kpi-label">last mock score</div>
+          <div class="dim small">${last
+            ? `${last.score}/${last.total} on ${last.date}${last.label ? ' · ' + esc(last.label) : ''} · gate is 75%`
+            : 'No mock yet — this is the only number that predicts the result.'}</div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-num">${cw && cw !== 'past' ? cw.n : (cw === 'past' ? '—' : '0')}<span class="unit">/9</span></div>
+          <div class="kpi-label">study week</div>
+          <div class="dim small">${cw && cw !== 'past' ? esc(cw.theme) : (cw === 'past' ? 'past the plan — mock mode' : 'starts ' + fmt(PLAN.weeks[0].from))}</div>
+        </div>
+      </div>
+
+      ${prio.length ? `<div class="alert">
+        <b>Highest-risk topic still open:</b>
+        ${prio.map(t => `<a href="#study/topics" data-focus="${t.id}">§${t.id} ${esc(t.title)}</a>`).join(' · ')}
+        <div class="small">New in the Oct 2025 rewrite, and most third-party prep material has not caught up. Week 6 exists for this.</div>
+      </div>` : ''}
+
+      <div class="card do-now">
+        <h2>Do this now</h2>
+
+        ${shortlist.length ? `<ul class="tasks do-tasks">
+          ${shortlist.map(x => `<li><label><input type="checkbox" data-task="${x.key}"> ${esc(x.task)}</label></li>`).join('')}
+        </ul>` : `<p class="dim do-empty">${cw === 'past'
+          ? 'Plan complete — you are in mock-and-review mode.'
+          : cw ? `Week ${cw.n} is fully ticked. Take the recommended drill below.`
+               : `Plan starts ${fmt(PLAN.weeks[0].from)}.`}</p>`}
+
+        <div class="do-actions">
+          <button class="primary" data-go-cards${due ? '' : ' disabled'}>${due ? `Review ${due} due card${due > 1 ? 's' : ''}` : 'No cards due'}</button>
+          <button class="primary" data-drill="${drill.mode}"${drill.section ? ` data-section="${drill.section}"` : ''}>${esc(drill.label)}</button>
+        </div>
+
+        <p class="small dim do-foot">Three things, in this order. Everything else is on the other tabs and can wait.</p>
+      </div>
+
+      <div class="card cover">
+        <div class="cover-row">
+          <span class="cover-label">Exam surface ticked off</span>
+          <div class="bar"><i style="width:${coverage.toFixed(0)}%"></i></div>
+          <span class="mono dim">${coverage.toFixed(0)}%</span>
+        </div>
+        <p class="small dim">Self-ticked, weighted by section. A progress meter, not a readiness score — the mock number above is the one to trust.</p>
+      </div>
+    `;
+  }
+
+  function bindToday() {
+    bindTasks();
+
+    const cards = $('[data-go-cards]');
+    if (cards) cards.onclick = () => {
+      startCardQueue('due');
+      location.hash = 'drill/cards';
+    };
+
+    const d = $('[data-drill]');
+    if (d) d.onclick = () => {
+      if (!Quiz.start(d.dataset.drill, { section: d.dataset.section })) return;
+      quizStage = 'run';
+      location.hash = 'drill/mock';
+    };
+  }
+
+  /* ---------------- Plan ---------------- */
+
+  function viewPlan() {
+    const cw = currentWeek();
+    const t = today();
+    const slip = slippedTasks();
+    const mocks = Store.state.mocks;
 
     const weeks = PLAN.weeks.map(w => {
       const c = Store.weekCompletion(w);
@@ -262,7 +175,7 @@
         <div class="chips">
           ${w.topics.map(id => {
             const tp = topicById(id);
-            return tp ? `<a class="chip ${PREP[tp.prep].cls}" href="#blueprint" data-focus="${id}">§${id}</a>` : '';
+            return tp ? `<a class="chip ${PREP[tp.prep].cls}" href="#study/topics" data-focus="${id}">§${id}</a>` : '';
           }).join('')}
         </div>
         <ul class="tasks">
@@ -274,17 +187,34 @@
       </details>`;
     }).join('');
 
+    const sectionRows = BP.sections.map(s => {
+      const pct = Store.sectionCompletion(s) * 100;
+      const gap = (s.weight * (1 - pct / 100)).toFixed(1);
+      return `<tr>
+        <td class="mono sec-id">§${s.id}</td>
+        <td data-label="Section"><a href="#study/topics" data-focus="${s.topics[0].id}">${esc(s.title)}</a></td>
+        <td class="mono" data-label="Weight">${s.weight}%</td>
+        <td class="bar-cell" data-label="Ticked"><div class="bar"><i style="width:${pct.toFixed(0)}%"></i></div><span class="mono dim">${pct.toFixed(0)}%</span></td>
+        <td class="mono ${gap > 8 ? 'warn' : ''}" data-label="Points left">${gap}</td>
+      </tr>`;
+    }).join('');
+
+    const trend = mocks.length
+      ? mocks.map(m => `<li><span class="mono">${m.date}</span> <b class="${mockPct(m) >= 75 ? 'ok' : 'warn'}">${mockPct(m)}%</b> <span class="dim">${m.score}/${m.total} ${esc(m.label)}</span></li>`).join('')
+      : '<li class="dim">No mocks logged yet. Week 1 baseline first.</li>';
+
     return `
       <div class="card meta">
         <div>
           <b>9 weeks · ~${PLAN.hoursPerWeek} h/week</b> — ${fmt(PLAN.start)} to ${fmt(PLAN.weeks[8].to)}, then final review ${fmt(PLAN.finalReview.from)}–${fmt(PLAN.finalReview.to)}, exam ${fmt(PLAN.examDate)}.
           <div class="small dim">A fail carries a 14-day wait, so an Oct 9 attempt still leaves ${fmt(PLAN.retakeWindow)} for a retake — inside the Oct 2026 goal.</div>
         </div>
+        <div class="links"><label class="date-set">Exam date <input type="date" id="exam-date" value="${Store.state.examDate}"></label></div>
       </div>
 
       ${slip > 0 ? `<div class="alert warn-alert">
         <b>${slip} task${slip > 1 ? 's' : ''} left behind in weeks that have already ended.</b>
-        <div class="small">Do not try to catch up on everything. Carry forward only what feeds a section with high unearned weight — check the Dashboard — and abandon the rest.</div>
+        <div class="small">Do not try to catch up on everything. Carry forward only what feeds a section with points still on the table — see the table below — and abandon the rest.</div>
       </div>` : ''}
 
       ${weeks}
@@ -298,15 +228,55 @@
           }).join('')}
         </ul>
       </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>Where the next point is</h2>
+          <table class="tbl stack">
+            <thead><tr><th></th><th>Section</th><th>Weight</th><th>Ticked</th><th title="Exam weight you have not yet earned">Points left</th></tr></thead>
+            <tbody>${sectionRows}</tbody>
+          </table>
+          <p class="small dim">Points left = section weight × (1 − ticked). Attack the biggest number, not the lowest percentage.</p>
+        </div>
+
+        <div class="card">
+          <h2>Mock scores</h2>
+          <ul class="mocks">${trend}</ul>
+          <div class="row">
+            <input type="number" id="mock-score" placeholder="score" min="0">
+            <input type="number" id="mock-total" placeholder="of" value="60" min="1">
+            <input type="text" id="mock-label" placeholder="label (optional)">
+            <button id="mock-add">Log</button>
+          </div>
+          <p class="small dim">Go/no-go gate: ≥75% on section drills before you sit it.</p>
+        </div>
+      </div>
     `;
   }
 
   function bindPlan() {
-    document.querySelectorAll('input[data-task]').forEach(cb => {
+    bindTasks();
+
+    const d = $('#exam-date');
+    if (d) d.onchange = () => { Store.setExamDate(d.value); render(); };
+
+    const add = $('#mock-add');
+    if (add) add.onclick = () => {
+      const s = $('#mock-score').value, t = $('#mock-total').value;
+      if (s === '' || t === '' || +t <= 0) return;
+      Store.addMock(s, t, $('#mock-label').value.trim());
+      render();
+    };
+  }
+
+  // Task checkboxes appear on both Today and Plan.
+  function bindTasks() {
+    $$('input[data-task]').forEach(cb => {
       cb.onchange = () => {
         Store.setTask(cb.dataset.task, cb.checked);
-        cb.closest('li').classList.toggle('on', cb.checked);
-        // Refresh the header counters without collapsing the open week.
+        const li = cb.closest('li');
+        if (li) li.classList.toggle('on', cb.checked);
+        // Keep the week header counters live without collapsing the open week.
         const d = cb.closest('details');
         if (d) {
           const w = PLAN.weeks.find(w => cb.dataset.task.startsWith(`w${w.n}:`));
@@ -316,11 +286,214 @@
             d.querySelector('summary .mono.dim:last-child').textContent = `${c.done}/${c.total}`;
           }
         }
+        updateBadges();
       };
     });
   }
 
-  /* ---------------- Case studies ---------------- */
+  /* ---------------- Study · topics ---------------- */
+
+  let bpFilter = 'all';
+
+  function viewTopics() {
+    const sections = BP.sections.map(s => {
+      const topics = s.topics.filter(t => {
+        if (bpFilter === 'gaps') return t.prep === 'gap';
+        if (bpFilter === 'lowconf') return (Store.topic(t.id).conf || 0) <= 2;
+        if (bpFilter === 'open') return Store.topicCompletion(t.id) < 1;
+        if (bpFilter === 'noted') return !!Store.note(t.id);
+        return true;
+      });
+      if (!topics.length) return '';
+
+      return `<section class="card sec">
+        <header class="sec-head">
+          <h2><span class="mono dim">§${s.id}</span> ${esc(s.title)}</h2>
+          <span class="weight">${s.weight}% of exam</span>
+        </header>
+        ${topics.map(t => topicCard(t)).join('')}
+      </section>`;
+    }).join('');
+
+    const noted = allTopics().filter(t => Store.note(t.id)).length;
+
+    return `
+      <div class="card meta">
+        <div>
+          <b>Exam guide revision ${BP.guideRevision}</b> — ${BP.exam.questions} questions · ${BP.exam.minutes} min · ${BP.exam.price} · valid ${BP.exam.validityYears} years · case studies ${BP.exam.caseStudyShare} of questions
+          <div class="small dim">Every sub-section is one row: open it for the official bullets, the docs, your notes and the tracking. ${noted} of ${allTopics().length} have notes. Retired case studies: ${BP.retiredCaseStudies.join(', ')} — any prep source still using these predates the current exam.</div>
+        </div>
+        <div class="links">
+          <a href="${BP.guideUrl}" target="_blank" rel="noopener">Official guide PDF</a>
+          <button id="notes-md">Export notes</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        ${[['all', 'All 22'], ['open', 'Not finished'], ['gaps', 'Book gaps'], ['lowconf', 'Low confidence'], ['noted', 'Has notes']]
+          .map(([k, l]) => `<button class="f${bpFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}
+      </div>
+      ${sections || '<div class="card dim">Nothing matches this filter.</div>'}
+    `;
+  }
+
+  // Collapsed by default: one row per sub-section, everything about it inside.
+  function topicCard(t) {
+    const st = Store.topic(t.id);
+    const cov = PREP[t.prep] || PREP.partial;
+    const done = Number(st.read) + Number(st.hands) + Number(st.drilled);
+    const tables = window.DECISIONS.filter(d => d.topic === t.id);
+    const qn = window.QUESTIONS.filter(q => q.t === t.id).length;
+    const hasNote = !!Store.note(t.id);
+
+    return `<details class="topic${t.priority ? ' prio' : ''}" id="t-${t.id}">
+      <summary>
+        <span class="mono t-id">${t.id}</span>
+        <span class="t-title">${esc(t.title)}</span>
+        <span class="t-status">
+          <span class="chip ${cov.cls}">${cov.label}</span>
+          <span class="mono dim" title="study actions done">${done}/3</span>
+          <span class="mono ${st.conf ? 'conf-on' : 'dim'}" title="confidence">${st.conf ? st.conf + '/5' : '–/5'}</span>
+          <span class="dot-has${hasNote ? '' : ' off'}" title="${hasNote ? 'you have notes' : 'no notes yet'}"></span>
+        </span>
+      </summary>
+
+      <div class="topic-body">
+        ${t.bullets.length ? `<ul class="bullets">${t.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+        ${t.note ? `<p class="note">${esc(t.note)}</p>` : ''}
+
+        <div class="refs">
+          ${(t.docs || []).map(d => `<a class="ref doc" href="${d.url}" target="_blank" rel="noopener">${esc(d.label)}</a>`).join('')}
+          ${tables.map(d => `<a class="ref doc" href="#study/decisions">▤ ${esc(d.title)}</a>`).join('')}
+          ${qn ? `<button class="ref doc" data-tdrill="${t.id}">▶ Drill ${qn} question${qn > 1 ? 's' : ''}</button>` : ''}
+        </div>
+
+        <div class="track">
+          ${[['read', 'Read'], ['hands', 'Hands-on'], ['drilled', 'Drilled']].map(([k, l]) =>
+            `<label class="cb${st[k] ? ' on' : ''}"><input type="checkbox" data-topic="${t.id}" data-flag="${k}"${st[k] ? ' checked' : ''}> ${l}</label>`).join('')}
+          <span class="conf">Confidence
+            ${[1, 2, 3, 4, 5].map(n => `<button class="dot${st.conf >= n ? ' on' : ''}" data-conf="${t.id}" data-n="${n}" title="${n}/5">${n}</button>`).join('')}
+          </span>
+        </div>
+
+        <label class="note-label" for="n-${t.id}">Your notes — what you will actually recall under pressure</label>
+        <textarea id="n-${t.id}" class="notes-area sm" rows="5" data-note="${t.id}"
+          placeholder="Decision rules, service comparisons, things you got wrong in a mock.">${esc(Store.note(t.id))}</textarea>
+      </div>
+    </details>`;
+  }
+
+  function bindTopics() {
+    $$('[data-filter]').forEach(b => {
+      b.onclick = () => { bpFilter = b.dataset.filter; render(); };
+    });
+
+    $$('input[data-topic]').forEach(cb => {
+      cb.onchange = () => {
+        Store.setTopicFlag(cb.dataset.topic, cb.dataset.flag, cb.checked);
+        cb.closest('.cb').classList.toggle('on', cb.checked);
+        refreshTopicStatus(cb.dataset.topic);
+      };
+    });
+
+    // Toggle in place — a full re-render would scroll the card out from under the cursor.
+    $$('[data-conf]').forEach(b => {
+      b.onclick = () => {
+        const id = b.dataset.conf, n = +b.dataset.n;
+        const next = Store.topic(id).conf === n ? 0 : n;
+        Store.setConfidence(id, next);
+        if (bpFilter === 'lowconf') { render(); return; }   // the card may no longer belong in this filter
+        const row = b.closest('.conf');
+        row.querySelectorAll('.dot').forEach(d => d.classList.toggle('on', +d.dataset.n <= next));
+        refreshTopicStatus(id);
+      };
+    });
+
+    $$('textarea[data-note]').forEach(ta => {
+      const id = ta.dataset.note;   // captured now, not read when the timer fires
+      let t;
+      ta.oninput = () => {
+        clearTimeout(t);
+        t = setTimeout(() => { Store.setNote(id, ta.value); refreshTopicStatus(id); }, 400);
+      };
+    });
+
+    $$('[data-tdrill]').forEach(b => {
+      b.onclick = () => {
+        if (!Quiz.start('topic', { topic: b.dataset.tdrill })) return;
+        quizStage = 'run';
+        location.hash = 'drill/mock';
+      };
+    });
+
+    const md = $('#notes-md');
+    if (md) md.onclick = exportNotesMarkdown;
+  }
+
+  // Keep a collapsed row's summary honest without re-rendering the page.
+  function refreshTopicStatus(id) {
+    const el = document.getElementById('t-' + id);
+    if (!el) return;
+    const st = Store.topic(id);
+    const done = Number(st.read) + Number(st.hands) + Number(st.drilled);
+    const spans = el.querySelectorAll('.t-status .mono');
+    if (spans[0]) spans[0].textContent = `${done}/3`;
+    if (spans[1]) {
+      spans[1].textContent = st.conf ? st.conf + '/5' : '–/5';
+      spans[1].className = 'mono ' + (st.conf ? 'conf-on' : 'dim');
+    }
+    const dot = el.querySelector('.dot-has');
+    if (dot) dot.classList.toggle('off', !Store.note(id));
+    updateBadges();
+  }
+
+  function exportNotesMarkdown() {
+    let out = `# PCA notes\n\nExam ${Store.state.examDate} · guide revision ${BP.guideRevision}\n`;
+    BP.sections.forEach(s => {
+      const written = s.topics.filter(t => Store.note(t.id));
+      if (!written.length) return;
+      out += `\n## §${s.id} ${s.title} (${s.weight}%)\n`;
+      written.forEach(t => { out += `\n### ${t.id} ${t.title}\n\n${Store.note(t.id)}\n`; });
+    });
+    const cases = window.CASES.filter(c => Store.note('case:' + c.id));
+    if (cases.length) {
+      out += `\n## Case study architectures\n`;
+      cases.forEach(c => { out += `\n### ${c.name}\n\n${Store.note('case:' + c.id)}\n`; });
+    }
+    const blob = new Blob([out], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `pca-notes-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* ---------------- Study · decision tables ---------------- */
+
+  function viewTables() {
+    return `
+      <div class="card meta"><div>
+        <b>Nine decision tables</b> — service selection is where this exam is won and lost.
+        The third column is the phrase in a question stem that points at that row; that is what you drill.
+        <div class="small dim">Run these from memory on paper during final review.</div>
+      </div></div>
+      ${window.DECISIONS.map(d => `<div class="card">
+        <div class="topic-head">
+          <h3>${esc(d.title)}</h3>
+          <a class="chip cov-partial" href="#study/topics" data-focus="${d.topic}">§${d.topic}</a>
+        </div>
+        <p class="note">${esc(d.intro)}</p>
+        <div class="tbl-scroll">
+          <table class="tbl dec stack">
+            <thead><tr>${d.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+            <tbody>${d.rows.map(r => `<tr>${r.map((cell, i) =>
+              `<td class="${i === 0 ? 'dec-opt' : i === 2 ? 'dec-tell' : ''}" data-label="${esc(d.cols[i] || '')}">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </div>`).join('')}`;
+  }
+
+  /* ---------------- Study · case studies ---------------- */
 
   const KIND = {
     business:     { label: 'business',      cls: 'k-biz' },
@@ -400,7 +573,7 @@
       <div class="card">
         <h2>Your architecture — write it before revealing the reference</h2>
         <p class="small dim">Committing an answer first is what makes the comparison teach you anything. Saved locally as you type.</p>
-        <textarea id="case-answer" class="notes-area" rows="10"
+        <textarea id="case-answer" class="notes-area" rows="10" data-case-note="${c.id}"
           placeholder="Compute · data · networking · security · AI · ops. Name services and say why each requirement drove it.">${esc(mine)}</textarea>
         <div class="row" style="margin-top:10px">
           <button class="primary" id="case-reveal">${revealed ? 'Hide reference architecture' : 'Reveal reference architecture'}</button>
@@ -441,104 +614,29 @@
   }
 
   function bindCases() {
-    document.querySelectorAll('[data-case]').forEach(b => {
+    $$('[data-case]').forEach(b => {
       b.onclick = () => { openCase = b.dataset.case; caseFilter = 'all'; render(); window.scrollTo(0, 0); };
     });
     const back = $('#case-back');
     if (back) back.onclick = () => { openCase = null; render(); window.scrollTo(0, 0); };
-    document.querySelectorAll('[data-cfilter]').forEach(b => {
+    $$('[data-cfilter]').forEach(b => {
       b.onclick = () => { caseFilter = b.dataset.cfilter; render(); };
     });
     const rev = $('#case-reveal');
     if (rev) rev.onclick = () => { showRef[openCase] = !showRef[openCase]; render(); };
-    const ta = $('#case-answer');
+
+    const ta = $('[data-case-note]');
     if (ta) {
-      let t;
-      ta.oninput = () => { clearTimeout(t); t = setTimeout(() => Store.setNote('case:' + openCase, ta.value), 400); };
-    }
-  }
-
-  /* ---------------- Notes ---------------- */
-
-  let noteTopic = null;
-
-  function viewNotes() {
-    const topics = allTopics();
-    const t = noteTopic || topics[0].id;
-    const cur = topics.find(x => x.id === t);
-    const written = Store.notedIds().filter(id => !id.startsWith('case:'));
-
-    return `
-      <div class="card meta"><div>
-        <b>Per-topic notes</b> — your own words are what you will actually recall under exam pressure.
-        <div class="small dim">${written.length} of ${topics.length} sub-sections have notes. Saved locally;
-        use Export progress to back them up, or the button below for a markdown copy.</div>
-      </div>
-      <div class="links"><button id="notes-md">Export as markdown</button></div></div>
-
-      <div class="grid-2">
-        <div class="card">
-          <h2>${esc(cur.title)} <span class="mono dim">§${cur.id}</span></h2>
-          ${cur.bullets.length ? `<details><summary class="dim small">Official bullets for this sub-section</summary>
-            <ul class="bullets">${cur.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></details>` : ''}
-          <textarea id="note-area" class="notes-area" rows="16"
-            placeholder="What you learned, in your own words. Decision rules, service comparisons, things you got wrong in a mock.">${esc(Store.note(t))}</textarea>
-        </div>
-        <div class="card">
-          <h2>Sub-sections</h2>
-          <div class="note-list">
-            ${topics.map(x => `<button class="note-pick${x.id === t ? ' on' : ''}" data-note="${x.id}">
-              <span class="mono">${x.id}</span> ${esc(x.title.slice(0, 40))}${x.title.length > 40 ? '…' : ''}
-              ${Store.note(x.id) ? '<span class="dot-has"></span>' : ''}</button>`).join('')}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  function bindNotes() {
-    document.querySelectorAll('[data-note]').forEach(b => {
-      b.onclick = () => { noteTopic = b.dataset.note; render(); };
-    });
-    const ta = $('#note-area');
-    if (ta) {
+      const key = 'case:' + ta.dataset.caseNote;   // captured now — "← All cases" clears openCase
       let t;
       ta.oninput = () => {
         clearTimeout(t);
-        t = setTimeout(() => {
-          Store.setNote(noteTopic || allTopics()[0].id, ta.value);
-          const pick = document.querySelector(`[data-note="${noteTopic || allTopics()[0].id}"]`);
-          if (pick && ta.value && !pick.querySelector('.dot-has')) {
-            pick.insertAdjacentHTML('beforeend', '<span class="dot-has"></span>');
-          }
-        }, 400);
+        t = setTimeout(() => Store.setNote(key, ta.value), 400);
       };
     }
-    const md = $('#notes-md');
-    if (md) md.onclick = exportNotesMarkdown;
   }
 
-  function exportNotesMarkdown() {
-    let out = `# PCA notes\n\nExam ${Store.state.examDate} · guide revision ${BP.guideRevision}\n`;
-    BP.sections.forEach(s => {
-      const written = s.topics.filter(t => Store.note(t.id));
-      if (!written.length) return;
-      out += `\n## §${s.id} ${s.title} (${s.weight}%)\n`;
-      written.forEach(t => { out += `\n### ${t.id} ${t.title}\n\n${Store.note(t.id)}\n`; });
-    });
-    const cases = window.CASES.filter(c => Store.note('case:' + c.id));
-    if (cases.length) {
-      out += `\n## Case study architectures\n`;
-      cases.forEach(c => { out += `\n### ${c.name}\n\n${Store.note('case:' + c.id)}\n`; });
-    }
-    const blob = new Blob([out], { type: 'text/markdown' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `pca-notes-${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  /* ---------------- Mock tests ---------------- */
+  /* ---------------- Drill · mock tests ---------------- */
 
   let quizStage = 'menu';   // menu | run | results
   let tick = null;
@@ -553,10 +651,9 @@
     if (tick) { clearInterval(tick); tick = null; }
 
     if (quizStage === 'menu') {
-      document.querySelectorAll('[data-mode]').forEach(b => {
+      $$('[data-mode]').forEach(b => {
         b.onclick = () => {
-          const started = Quiz.start(b.dataset.mode, { section: b.dataset.section });
-          if (!started) return;
+          if (!Quiz.start(b.dataset.mode, { section: b.dataset.section })) return;
           quizStage = 'run';
           render();
         };
@@ -567,7 +664,7 @@
     if (quizStage === 'run') {
       const r = Quiz.current();
 
-      document.querySelectorAll('[data-opt]').forEach(b => {
+      $$('[data-opt]').forEach(b => {
         b.onclick = () => { Quiz.select(+b.dataset.opt); render(); };
       });
       const prev = $('#q-prev'), next = $('#q-next'), fin = $('#q-finish'), ab = $('#q-abandon');
@@ -575,7 +672,7 @@
       if (next) next.onclick = () => { r.i++; render(); };
       if (fin) fin.onclick = () => { quizStage = 'results'; render(); };
       if (ab) ab.onclick = () => { quizStage = 'results'; render(); };
-      document.querySelectorAll('[data-goto]').forEach(b => {
+      $$('[data-goto]').forEach(b => {
         b.onclick = () => { r.i = +b.dataset.goto; render(); };
       });
 
@@ -605,27 +702,38 @@
       Store.addMock(Quiz.grade(), r.qs.length, r.label);
       log.textContent = 'Logged ✓';
       log.disabled = true;
+      updateBadges();
     };
   }
 
-  /* ---------------- Flashcards ---------------- */
+  /* ---------------- Drill · flashcards ---------------- */
 
-  let cardQueue = null, cardShown = false, cardScope = 'due';
+  let cardQueue = null, cardShown = false;
+
+  const shuffled = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
+
+  function startCardQueue(mode, topic) {
+    const all = window.FLASHCARDS;
+    const q = mode === 'due' ? Store.dueCards(all)
+            : mode === 'topic' ? all.filter(c => c.topic === topic)
+            : all.slice();
+    cardQueue = shuffled(q);
+    cardShown = false;
+  }
 
   function viewCards() {
     const all = window.FLASHCARDS;
     const due = Store.dueCards(all);
 
     if (!cardQueue) {
-      const counts = { due: due.length, all: all.length };
       const byTopic = {};
-      all.forEach(c => { byTopic[c.t || c.topic] = (byTopic[c.t || c.topic] || 0) + 1; });
+      all.forEach(c => { byTopic[c.topic] = (byTopic[c.topic] || 0) + 1; });
 
       return `
         <div class="card meta"><div>
           <b>${all.length} cards</b> — the decision tables plus the high-confusion pairs the exam keeps
           returning to. Spaced repetition: cards you find hard come back sooner.
-          <div class="small dim">${counts.due} due now.</div>
+          <div class="small dim">${due.length} due now.</div>
         </div></div>
         <div class="grid-2">
           <div class="card">
@@ -671,21 +779,12 @@
   }
 
   function bindCards() {
-    document.querySelectorAll('[data-cards]').forEach(b => {
-      b.onclick = () => {
-        const all = window.FLASHCARDS;
-        const mode = b.dataset.cards;
-        let q = mode === 'due' ? Store.dueCards(all)
-              : mode === 'topic' ? all.filter(c => c.topic === b.dataset.topic)
-              : all.slice();
-        cardQueue = q.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(p => p[1]);
-        cardShown = false;
-        render();
-      };
+    $$('[data-cards]').forEach(b => {
+      b.onclick = () => { startCardQueue(b.dataset.cards, b.dataset.topic); render(); };
     });
     const show = $('#c-show');
     if (show) show.onclick = () => { cardShown = true; render(); };
-    document.querySelectorAll('[data-grade]').forEach(b => {
+    $$('[data-grade]').forEach(b => {
       b.onclick = () => {
         const g = +b.dataset.grade, c = cardQueue[0];
         Store.gradeCard(c.id, g);
@@ -693,73 +792,116 @@
         if (g === 0) cardQueue.push(c);        // failed cards come back this session
         cardShown = false;
         render();
+        updateBadges();
       };
     });
     const done = $('#c-done');
     if (done) done.onclick = () => { cardQueue = null; cardShown = false; render(); };
   }
 
-  /* ---------------- Decision tables ---------------- */
-
-  function viewTables() {
-    return `
-      <div class="card meta"><div>
-        <b>Nine decision tables</b> — service selection is where this exam is won and lost.
-        The third column is the phrase in a question stem that points at that row; that is what you drill.
-        <div class="small dim">Run these from memory on paper during final review.</div>
-      </div></div>
-      ${window.DECISIONS.map(d => `<div class="card">
-        <div class="topic-head">
-          <h3>${esc(d.title)}</h3>
-          <a class="chip cov-partial" href="#blueprint" data-focus="${d.topic}">§${d.topic}</a>
-        </div>
-        <p class="note">${esc(d.intro)}</p>
-        <div class="tbl-scroll">
-          <table class="tbl dec stack">
-            <thead><tr>${d.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
-            <tbody>${d.rows.map(r => `<tr>${r.map((cell, i) =>
-              `<td class="${i === 0 ? 'dec-opt' : i === 2 ? 'dec-tell' : ''}" data-label="${esc(d.cols[i] || '')}">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
-          </table>
-        </div>
-      </div>`).join('')}`;
-  }
-
   /* ---------------- Shell ---------------- */
 
+  // Four modes. Anything with more than one job inside it gets sub-tabs, never a nav slot.
   const VIEWS = {
-    dashboard: { title: 'Dashboard', render: viewDashboard, bind: bindDashboard },
-    blueprint: { title: 'Blueprint', render: viewBlueprint, bind: bindBlueprint },
-    plan: { title: 'Plan', render: viewPlan, bind: bindPlan },
-    cases: { title: 'Case studies', render: viewCases, bind: bindCases },
-    notes: { title: 'Notes', render: viewNotes, bind: bindNotes },
-    quiz: { title: 'Mock tests', render: viewQuiz, bind: bindQuiz },
-    cards: { title: 'Flashcards', render: viewCards, bind: bindCards },
-    tables: { title: 'Decision tables', render: viewTables, bind: () => {} }
+    today: { render: viewToday, bind: bindToday },
+    plan:  { render: viewPlan,  bind: bindPlan },
+    study: {
+      def: 'topics',
+      tabs: {
+        topics:    { label: 'Topics',    render: viewTopics, bind: bindTopics },
+        decisions: { label: 'Decisions', render: viewTables, bind: () => {} },
+        cases:     { label: 'Cases',     render: viewCases,  bind: bindCases }
+      }
+    },
+    drill: {
+      def: 'mock',
+      tabs: {
+        mock:  { label: 'Mock exam',  render: viewQuiz,  bind: bindQuiz },
+        cards: { label: 'Flashcards', render: viewCards, bind: bindCards }
+      }
+    }
   };
 
-  let pendingFocus = null;
+  // Old bookmarks and any stale deep link still land somewhere sensible.
+  const LEGACY = {
+    dashboard: 'today', blueprint: 'study/topics', notes: 'study/topics',
+    tables: 'study/decisions', cases: 'study/cases', quiz: 'drill/mock', cards: 'drill/cards'
+  };
+
+  let pendingFocus = null, lastRoute = null;
 
   function render() {
     if (tick) { clearInterval(tick); tick = null; }
-    const name = (location.hash.slice(1) || 'dashboard').split('?')[0];
-    const view = VIEWS[name] || VIEWS.dashboard;
 
-    $('#view').innerHTML = view.render();
-    view.bind();
+    const raw = location.hash.slice(1).split('?')[0].replace(/^\/+|\/+$/g, '');
+    if (LEGACY[raw]) { location.replace('#' + LEGACY[raw]); return; }   // re-enters via hashchange
 
-    document.querySelectorAll('nav a').forEach(a =>
-      a.classList.toggle('on', a.getAttribute('href') === '#' + name));
+    const [reqName, reqTab] = raw.split('/');
+    const name = VIEWS[reqName] ? reqName : 'today';
+    const v = VIEWS[name];
+    const tab = v.tabs ? (v.tabs[reqTab] ? reqTab : v.def) : null;
+    const leaf = tab ? v.tabs[tab] : v;
 
-    // Cross-view deep links: #blueprint + data-focus scrolls to a topic.
-    document.querySelectorAll('[data-focus]').forEach(a => {
-      a.addEventListener('click', () => { pendingFocus = a.dataset.focus; });
+    const routeChanged = (name + '/' + tab) !== lastRoute;
+    lastRoute = name + '/' + tab;
+
+    $('#view').innerHTML =
+      (v.tabs ? subnav(name, v, tab) : '') + leaf.render();
+    leaf.bind();
+
+    $$('nav > a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + name));
+    updateBadges();
+
+    // Cross-view deep links: any data-focus lands on the matching Study topic.
+    $$('[data-focus]').forEach(a => {
+      a.addEventListener('click', () => { pendingFocus = a.dataset.focus; bpFilter = 'all'; });
     });
 
-    if (pendingFocus && name === 'blueprint') {
+    if (pendingFocus && name === 'study' && tab === 'topics') {
       const el = document.getElementById('t-' + pendingFocus);
-      if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); }
       pendingFocus = null;
+      if (el) {
+        el.open = true;
+        el.scrollIntoView({ block: 'center' });
+        el.classList.add('flash');
+        return;
+      }
     }
+
+    // Only a real navigation resets scroll — in-view re-renders must stay put.
+    if (routeChanged) window.scrollTo(0, 0);
+  }
+
+  function subnav(name, v, cur) {
+    return `<div class="subnav">${Object.entries(v.tabs).map(([k, t]) => {
+      const n = tabBadge(name, k);
+      return `<a href="#${name}/${k}" class="${cur === k ? 'on' : ''}">${t.label}${n ? ` <b>${n}</b>` : ''}</a>`;
+    }).join('')}</div>`;
+  }
+
+  function tabBadge(name, tab) {
+    if (name === 'drill' && tab === 'cards') return Store.dueCards(window.FLASHCARDS).length;
+    if (name === 'drill' && tab === 'mock') return Store.leeches().length;
+    if (name === 'study' && tab === 'topics') return allTopics().filter(t => t.prep === 'gap' && Store.topicCompletion(t.id) < 1).length;
+    return 0;
+  }
+
+  // Counts in the nav so nothing has to be hunted for.
+  function updateBadges() {
+    const counts = {
+      today: openTasks().length,
+      plan: slippedTasks(),
+      study: tabBadge('study', 'topics'),
+      drill: Store.dueCards(window.FLASHCARDS).length + Store.leeches().length
+    };
+    $$('nav > a').forEach(a => {
+      const key = a.getAttribute('href').slice(1);
+      const n = counts[key] || 0;
+      let b = a.querySelector('b');
+      if (!n) { if (b) b.remove(); return; }
+      if (!b) { b = document.createElement('b'); a.appendChild(b); }
+      b.textContent = n;
+    });
   }
 
   window.addEventListener('hashchange', render);

@@ -71,13 +71,16 @@
   const isCorrect = (q, ans) =>
     !!ans && ans.length === q.a.length && q.a.every(x => ans.includes(x));
 
+  // Called on every render of the results page, so history is recorded once per run —
+  // otherwise re-visiting a finished mock keeps inflating wrong counts and inventing leeches.
   function grade() {
     let score = 0;
     run.qs.forEach((q, i) => {
       const ok = isCorrect(q, run.answers[i]);
       if (ok) score++;
-      Store.recordAnswer(q.id, ok);
+      if (!run.graded) Store.recordAnswer(q.id, ok);
     });
+    run.graded = true;
     return score;
   }
 
@@ -147,7 +150,7 @@
 
       <div class="card question">
         <div class="q-meta">
-          <a class="chip cov-partial" href="#blueprint" data-focus="${q.t}">§${q.t}</a>
+          <a class="chip cov-partial" href="#study/topics" data-focus="${q.t}">§${q.t}</a>
           ${cs ? `<span class="chip cov-none">${esc(cs.name)}</span>` : ''}
           ${multi ? '<span class="chip cov-good">choose 2</span>' : ''}
         </div>
@@ -226,7 +229,7 @@
     ans = ans || [];
     return `<div class="review">
       <div class="q-meta">
-        <a class="chip cov-partial" href="#blueprint" data-focus="${q.t}">§${q.t}</a>
+        <a class="chip cov-partial" href="#study/topics" data-focus="${q.t}">§${q.t}</a>
         ${isCorrect(q, ans) ? '<span class="chip cov-good">correct</span>' : '<span class="chip cov-none">missed</span>'}
       </div>
       <p class="q-text">${esc(q.q)}</p>

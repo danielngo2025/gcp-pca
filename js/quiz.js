@@ -230,7 +230,7 @@
     return `<div class="review">
       <div class="q-meta">
         <a class="chip cov-partial" href="#study/topics" data-focus="${q.t}">§${q.t}</a>
-        ${isCorrect(q, ans) ? '<span class="chip cov-good">correct</span>' : '<span class="chip cov-none">missed</span>'}
+        ${isCorrect(q, ans) ? '<span class="chip res-ok">correct</span>' : '<span class="chip res-miss">missed</span>'}
       </div>
       <p class="q-text">${esc(q.q)}</p>
       <ul class="review-opts">

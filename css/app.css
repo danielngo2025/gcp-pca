@@ -166,14 +166,23 @@ button { font: inherit; cursor: pointer; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* Colour is reserved for state that needs acting on. A prep chip already spells out
+   "GAP" or "partial", so hue was repeating what the label said — and 22 rows of it
+   read as noise. Signals rank by weight instead: GAP is the only one that darkens. */
 .chip {
   display: inline-block; padding: 2px 9px; border-radius: 20px;
   font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
-  text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+  text-decoration: none; white-space: nowrap;
+  background: var(--panel-2); color: var(--dim); border: 1px solid var(--line);
 }
-.cov-good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
-.cov-partial { background: color-mix(in srgb, var(--partial) 16%, transparent); color: var(--partial); border-color: color-mix(in srgb, var(--partial) 35%, transparent); }
-.cov-none { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+a.chip:hover, button.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.cov-good, .cov-partial { font-weight: 500; }
+.cov-none { color: var(--text); border-color: var(--dim); }
+
+/* Answer feedback is the one place hue earns its keep — it is the whole message. */
+.chip.res-ok   { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.chip.res-miss { color: var(--bad);  border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
 
 /* ---- alerts ---- */
 
@@ -277,8 +286,8 @@ button.ref { font-family: inherit; }
   font-size: 12.5px; padding: 4px 10px; border-radius: 6px;
   background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; user-select: none;
 }
-.cb.on { border-color: var(--good); color: var(--good); }
-.cb input { margin: 0; accent-color: var(--good); }
+.cb.on { border-color: var(--dim); color: var(--text); background: var(--line); }
+.cb input { margin: 0; accent-color: var(--accent); }
 
 .conf { margin-left: auto; font-size: 12px; color: var(--dim); display: inline-flex; align-items: center; gap: 4px; }
 .dot {
@@ -303,7 +312,7 @@ button.ref { font-family: inherit; }
 .week.now { border-color: var(--accent); }
 .week.now .wk { color: var(--accent); }
 .week.behind .wk { color: var(--partial); }
-.week.done .wk { color: var(--good); }
+.week.done .wk { color: var(--dim); }                /* done = nothing to act on */
 
 .week > .note, .week > .chips { margin: 14px 18px; }
 .week .chips { margin-top: -4px; }
@@ -312,7 +321,7 @@ button.ref { font-family: inherit; }
 .tasks li { padding: 4px 0; font-size: 13.5px; }
 .tasks li.on { color: var(--dim); text-decoration: line-through; }
 .tasks label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
-.tasks input { margin: 4px 0 0; accent-color: var(--good); flex-shrink: 0; }
+.tasks input { margin: 4px 0 0; accent-color: var(--accent); flex-shrink: 0; }
 
 /* ---- misc lists ---- */
 
@@ -445,10 +454,8 @@ button.chip { cursor: pointer; font-family: inherit; }
 .case-card .refs { align-items: center; }
 .case-card .refs .ref { padding: 6px 12px; }
 
-.k-biz  { background: color-mix(in srgb, #a142f4 16%, transparent); color: #a142f4; border-color: color-mix(in srgb, #a142f4 35%, transparent); }
-.k-tech { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-.k-nf   { background: color-mix(in srgb, #12b5cb 16%, transparent); color: #12b5cb; border-color: color-mix(in srgb, #12b5cb 35%, transparent); }
-.k-comp { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+/* Requirement kinds are spelled out in words ("business", "compliance"), so they
+   inherit the neutral chip. Four extra hues bought nothing the label did not. */
 
 .req { padding: 14px 0; border-top: 1px solid var(--line); }
 .req:first-of-type { border-top: 0; }
@@ -471,7 +478,7 @@ button.chip { cursor: pointer; font-family: inherit; }
 .notes-area:focus { outline: 0; border-color: var(--accent); }
 
 .notes-area.sm { min-height: 90px; font-size: 13.5px; }
-.dot-has { width: 6px; height: 6px; border-radius: 50%; background: var(--good); margin-left: auto; flex-shrink: 0; }
+.dot-has { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); margin-left: auto; flex-shrink: 0; }
 
 /* ---- today ---- */
 

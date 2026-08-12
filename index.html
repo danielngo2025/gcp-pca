@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PCA — Professional Cloud Architect, Oct 2026</title>
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/app.css?v=3">
 </head>
 <body>
   <header class="top">
@@ -25,14 +25,21 @@
 
   <main id="view"></main>
 
-  <!-- Plain script tags, not fetch(): keeps the site working from file:// with no server. -->
-  <script src="data/blueprint.js"></script>
-  <script src="data/plan.js"></script>
-  <script src="data/questions.js"></script>
-  <script src="data/decisions.js"></script>
-  <script src="data/cases.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/quiz.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Plain script tags, not fetch(): keeps the site working from file:// with no server.
+
+       ?v= must be bumped on every deploy that changes a route or a data shape.
+       GitHub Pages serves everything with max-age=600 and caches each file
+       independently, so without this a browser can pair a fresh index.html with a
+       ten-minute-stale app.js — which is how "click Mock, get Today" happened.
+       The stamp makes the whole set version together: you get all-new or all-old,
+       never a mix. -->
+  <script src="data/blueprint.js?v=3"></script>
+  <script src="data/plan.js?v=3"></script>
+  <script src="data/questions.js?v=3"></script>
+  <script src="data/decisions.js?v=3"></script>
+  <script src="data/cases.js?v=3"></script>
+  <script src="js/store.js?v=3"></script>
+  <script src="js/quiz.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
 </body>
 </html>

@@ -40,6 +40,7 @@ button, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 .dim { color: var(--dim); }
 .small { font-size: 12.5px; }
 .warn { color: var(--bad) !important; }
+.ok { color: var(--good); }
 
 /* ---- header / nav ---- */
 
@@ -66,6 +67,15 @@ nav a {
 nav a:hover { background: var(--panel-2); color: var(--text); }
 nav a.on { background: var(--accent); color: #fff; }
 
+/* Count badges: how many things are waiting behind a tab, without opening it. */
+nav a b, .subnav a b {
+  display: inline-block; margin-left: 6px; padding: 0 5px;
+  min-width: 16px; border-radius: 9px;
+  font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center;
+  background: var(--panel-2); color: var(--dim);
+}
+nav a.on b, .subnav a.on b { background: rgba(255, 255, 255, .25); color: #fff; }
+
 .spacer { flex: 1; }
 
 header.top button {
@@ -76,6 +86,22 @@ header.top button {
 header.top button:hover { border-color: var(--accent); }
 
 main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+/* ---- sub-tabs (Study, Drill) ---- */
+
+.subnav {
+  display: flex; gap: 2px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none;
+}
+.subnav::-webkit-scrollbar { display: none; }
+.subnav a {
+  flex-shrink: 0; padding: 9px 15px; margin-bottom: -1px;
+  color: var(--dim); text-decoration: none; font-size: 13.5px; font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+.subnav a:hover { color: var(--text); }
+.subnav a.on { color: var(--text); border-bottom-color: var(--accent); }
+.subnav a.on b { background: var(--accent); color: #fff; }
 
 /* ---- layout ---- */
 
@@ -189,11 +215,40 @@ button { font: inherit; cursor: pointer; }
 .sec-head h2 { margin: 0; font-size: 14.5px; }
 .weight { font-size: 12px; color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.topic { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+/* Collapsed by default. One row per sub-section; ~250 lines of bullets stay folded
+   until asked for, which is what stops the page reading as a wall. */
+.topic { border-bottom: 1px solid var(--line); }
 .topic:last-child { border-bottom: 0; }
 .topic.prio { border-left: 3px solid var(--bad); }
 .topic.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { from { background: color-mix(in srgb, var(--accent) 18%, transparent); } }
+
+.topic > summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px; cursor: pointer; list-style: none; font-size: 13.5px;
+}
+.topic > summary::-webkit-details-marker { display: none; }
+.topic > summary::before {
+  content: '▸'; color: var(--dim); font-size: 11px; flex-shrink: 0;
+  transition: transform .15s; transform-origin: 50% 55%;
+}
+.topic[open] > summary::before { transform: rotate(90deg); }
+.topic > summary:hover { background: var(--panel-2); }
+.topic[open] > summary { background: var(--panel-2); border-bottom: 1px solid var(--line); }
+
+.topic .t-id { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+.topic .t-title { flex: 1; min-width: 0; font-weight: 500; }
+.topic .t-status { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.topic .t-status .conf-on { color: var(--text); }
+.topic .t-status .dot-has { margin-left: 0; }
+.topic .t-status .dot-has.off { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+
+.topic-body { padding: 14px 18px 18px; }
+.note-label {
+  display: block; margin: 16px 0 6px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--dim); font-weight: 600;
+}
 
 .topic-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .topic-head h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
@@ -214,6 +269,7 @@ button { font: inherit; cursor: pointer; }
   color: var(--dim); text-decoration: none;
 }
 .ref.doc:hover { border-color: var(--accent); color: var(--accent); }
+button.ref { font-family: inherit; }
 
 .track { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cb {
@@ -414,17 +470,26 @@ button.chip { cursor: pointer; font-family: inherit; }
 }
 .notes-area:focus { outline: 0; border-color: var(--accent); }
 
-.note-list { display: flex; flex-direction: column; gap: 3px; max-height: 520px; overflow-y: auto; }
-.note-pick {
-  display: flex; align-items: center; gap: 8px; text-align: left;
-  background: transparent; color: var(--text);
-  border: 1px solid transparent; border-radius: 6px;
-  padding: 6px 10px; font-size: 13px;
-}
-.note-pick:hover { background: var(--panel-2); }
-.note-pick.on { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
-.note-pick .mono { color: var(--accent); flex-shrink: 0; }
+.notes-area.sm { min-height: 90px; font-size: 13.5px; }
 .dot-has { width: 6px; height: 6px; border-radius: 50%; background: var(--good); margin-left: auto; flex-shrink: 0; }
+
+/* ---- today ---- */
+
+.do-now { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.do-tasks { padding: 0 0 4px; }
+.do-tasks li { padding: 6px 0; font-size: 14px; }
+.do-empty { font-size: 13.5px; margin: 0 0 10px; }
+.do-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.do-actions button.primary { margin: 0; text-align: left; }
+.do-foot { margin: 12px 0 0; }
+
+/* Coverage is a progress meter, so it gets a bar — not a headline number. */
+.cover-row { display: flex; align-items: center; gap: 12px; }
+.cover-label { font-size: 13px; color: var(--dim); flex-shrink: 0; }
+.cover .bar { height: 8px; }
+.cover p { margin: 9px 0 0; }
+
+.date-set { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--dim); }
 
 .meta .links button {
   background: var(--panel-2); color: var(--text);
@@ -433,8 +498,8 @@ button.chip { cursor: pointer; font-family: inherit; }
 .meta .links button:hover { border-color: var(--accent); }
 
 /* =========================================================================
-   Mobile. Three things drive this: the nav has eight destinations, several
-   tables are genuinely 3-wide, and the quiz needs to stay usable one-handed.
+   Mobile. Two things drive this: several tables are genuinely 3-wide, and
+   the quiz needs to stay usable one-handed. The nav itself now fits.
    ========================================================================= */
 
 .nav-right { display: inline-flex; gap: 8px; align-items: center; }
@@ -524,9 +589,12 @@ button.primary.sm { padding: 7px 12px; font-size: 12.5px; margin: 0; }
   .tbl.stack .dec-opt { font-size: 14px; }
   .tbl-scroll { overflow-x: visible; }
 
-  /* Blueprint */
+  /* Blueprint — the status cluster wraps under the title rather than squeezing it. */
   .sec-head { padding: 12px 14px; flex-direction: column; gap: 4px; align-items: flex-start; }
-  .topic { padding: 14px; }
+  .topic > summary { padding: 11px 14px; flex-wrap: wrap; gap: 8px; }
+  .topic .t-title { flex-basis: calc(100% - 60px); }
+  .topic .t-status { width: 100%; padding-left: 18px; }
+  .topic-body { padding: 12px 14px 16px; }
   .topic-head { flex-direction: column; gap: 6px; align-items: flex-start; }
   .track { gap: 6px; }
   .cb { padding: 8px 12px; font-size: 13px; }        /* touch target */
@@ -561,9 +629,13 @@ button.primary.sm { padding: 7px 12px; font-size: 12.5px; margin: 0; }
   .fc-grades button { min-height: 46px; }
 
   /* Notes */
-  .note-list { max-height: 260px; }
-  .note-pick { padding: 9px 10px; }
-  .notes-area { font-size: 15px; }                    /* ≥16px-ish avoids iOS zoom-on-focus */
+  .notes-area, .notes-area.sm { font-size: 15px; }    /* ≥16px-ish avoids iOS zoom-on-focus */
+
+  /* Today */
+  .do-actions { flex-direction: column; }
+  .do-actions button.primary { width: 100%; min-height: 44px; }
+  .cover-row { flex-wrap: wrap; }
+  .cover-label { width: 100%; }
 
   .filters .f, .drill { min-height: 40px; }
   .drill { padding: 10px 13px; white-space: normal; }
@@ -571,7 +643,7 @@ button.primary.sm { padding: 7px 12px; font-size: 12.5px; margin: 0; }
   /* Long §-titles inside chips overflow a phone viewport if they can't wrap. */
   .chip { font-size: 11px; white-space: normal; max-width: 100%; }
   .chips { max-width: 100%; }
-  .alert a, .chip, .drill, .note-pick, .req-text, .q-text, .fc-q, .fc-a {
+  .alert a, .chip, .drill, .t-title, .req-text, .q-text, .fc-q, .fc-a {
     overflow-wrap: anywhere;
   }
   .traps li, .bullets li { margin-bottom: 7px; }
